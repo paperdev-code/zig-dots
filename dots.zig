@@ -132,7 +132,7 @@ pub const Buffer = struct {
     }
 
     /// Get the value of a single dot in the buffer.
-    pub fn get(self : *Buffer, x : i16, y : i16) bool {
+    pub fn get(self : *Buffer, x : i16, y : i16) u1 {
         if (self.validPosition(x, y)) {
             const _x = @intCast(u8, x);
             const _y = @intCast(u8, y);
@@ -140,9 +140,9 @@ pub const Buffer = struct {
             const current = self.buffer[i];
             const m = mask(_x, _y);
             var new : u8 = 0;
-            return ((current & m) > 0);
+            return @boolToInt((current & m) > 0);
         }
-        else return false;
+        else return 0;
     }
 
     pub fn clear(self : *Buffer) void {
