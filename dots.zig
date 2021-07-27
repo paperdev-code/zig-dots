@@ -232,7 +232,7 @@ pub const Display = struct {
     }
 
     /// Prints the entire display represented in unicode braille characters.
-    pub fn print(self : *Display, buffer : *Buffer, col : i8, row : i8, writer : *std.fs.File.Writer) anyerror!void {
+    pub fn print(self : *Display, buffer : *Buffer, row : i8, col : i8, writer : *std.fs.File.Writer) anyerror!void {
         if (Config.compare(self.config, buffer.config) == false)
             return error.ConfigMismatch;
         try self.output.makePurpose(RepurposableBuffer.Purpose.terminal);
