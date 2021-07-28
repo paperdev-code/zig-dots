@@ -37,7 +37,7 @@ pub fn main() !void {
     }
 }
 ```
-Produces an ouput similar to this;
+Produces an output similar to this:
 ```
 ⢴⢰⢂⣥⡴⢵⢻⣊⡼⢚⣈⠜⢱⡥⠷⡍⡮⡔⣥⢉⡅⢁⡆⢔
 ⠎⣍⢐⢁⢛⢻⡶⡩⠷⠂⠒⣹⠞⢊⠸⡏⢞⢴⢀⣔⣺⡃⠞⠚
