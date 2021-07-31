@@ -24,13 +24,13 @@ const UnicodeLookup = [256][]const u8 {
 /// Used in memory management.
 pub const Config = struct {
     /// Width measured in dots.
-    width  : u8,
+    width  : u16,
     /// Height measured in dots.
-    height : u8,
+    height : u16,
     /// Width measured in bytes.
-    cols   : u8,
+    cols   : u16,
     /// Height measured in bytes.
-    rows   : u8,
+    rows   : u16,
     /// Allocator for []u8 allocation.
     allocator : *std.mem.Allocator,
 
@@ -43,12 +43,12 @@ pub const Config = struct {
 
     /// Initializes a config based on preferred width and height measured in dots.
     /// Dots (when displayed) are contained in a character, there are 8 in total. (2x4).
-    pub fn init(width : u8, height : u8, allocator : *std.mem.Allocator) Config {
+    pub fn init(width : u16, height : u16, allocator : *std.mem.Allocator) Config {
         return Config {
             .width = width,
             .height = height,
-            .cols = @divFloor(width,  2) + @as(u8, if (@mod(width,  2) > 0) 1 else 0),
-            .rows = @divFloor(height, 4) + @as(u8, if (@mod(height, 4) > 0) 1 else 0),
+            .cols = @divFloor(width,  2) + @as(u16, if (@mod(width,  2) > 0) 1 else 0),
+            .rows = @divFloor(height, 4) + @as(u16, if (@mod(height, 4) > 0) 1 else 0),
             .allocator = allocator,
         };
     }
@@ -86,7 +86,7 @@ pub const Buffer = struct {
     pub fn create(config : *const Config) !Buffer {
         const buffer = Buffer {
             .config = config,
-            .buffer = try config.allocator.alloc(u8, @as(u16, config.cols) * @as(u16, config.rows)),
+            .buffer = try config.allocator.alloc(u8, config.cols * config.rows),
         };
         std.mem.set(u8, buffer.buffer, 0);
         return buffer;
@@ -99,11 +99,11 @@ pub const Buffer = struct {
 
     /// Set the value of a single dot in the buffer.
     /// Choose between the different operations defined in the Operations enum.
-    pub fn set(self : *Buffer, x : i16, y : i16, op : Operation) void {
+    pub fn set(self : *Buffer, x : i32, y : i32, op : Operation) void {
         // Check whether position would result in a valid index.
         if (self.validPosition(x, y)) {
-            const _x = @intCast(u8, x);
-            const _y = @intCast(u8, y);
+            const _x = @intCast(u16, x);
+            const _y = @intCast(u16, y);
             // Get the index of the correct byte, and a bitmask to extract a single dot.
             const i = self.index(_x, _y);
             const m = mask(_x, _y);
@@ -131,10 +131,10 @@ pub const Buffer = struct {
     }
 
     /// Get the value of a single dot in the buffer.
-    pub fn get(self : *Buffer, x : i16, y : i16) u1 {
+    pub fn get(self : *Buffer, x : i32, y : i32) u1 {
         if (self.validPosition(x, y)) {
-            const _x = @intCast(u8, x);
-            const _y = @intCast(u8, y);
+            const _x = @intCast(u16, x);
+            const _y = @intCast(u16, y);
             const i = self.index(_x, _y);
             const m = mask(_x, _y);
             return @boolToInt((self.buffer[i] & m) > 0);
@@ -149,14 +149,14 @@ pub const Buffer = struct {
     /// Calculate total memory cost for a dots buffer.
     /// This calculates the total size of the buffer, including possible allocated space.
     /// It guarantees enough memory is available for any operation.
-    pub fn calculateSize(width : u8, height : u8) usize {
+    pub fn calculateSize(width : u16, height : u16) usize {
         const cols : u16 = @divFloor(@as(u16, width),  2) + @as(u16, if (@mod(@as(u16, width),  2) > 0) 1 else 0);
         const rows : u16 = @divFloor(@as(u16, height), 4) + @as(u16, if (@mod(@as(u16, height), 4) > 0) 1 else 0);
         return cols * rows + @sizeOf(@TypeOf(Buffer));
     }
 
     /// Bitmask for specifying a specific bit in a cell based on a dot's position.
-    fn mask(x : u8, y : u8) u8 {
+    fn mask(x : u16, y : u16) u8 {
         // A single cell is 2 dots wide and 4 dots high.
         // This converts an X Y value to a mask for any cell.
         const col = @mod(x, 2);
@@ -174,7 +174,7 @@ pub const Buffer = struct {
     }
 
     /// Returns whether a dot exists at a given position.
-    fn validPosition(self : *Buffer, x : i16, y : i16) bool {
+    fn validPosition(self : *Buffer, x : i32, y : i32) bool {
         return (x < self.config.width and y < self.config.height and x >= 0 and y >= 0);
     }
 };
@@ -191,8 +191,8 @@ pub const Display = struct {
     /// Initializes a Dots display and allocate memory for it's buffers.
     pub fn create(config : *const Config) !Display {
         // Calculate the amount of space required for all dots in the display.
-        const cols : u8 = @divFloor(config.width,  2) + @as(u8, if (@mod(config.width,  2) > 0) 1 else 0);
-        const rows : u8 = @divFloor(config.height, 4) + @as(u8, if (@mod(config.height, 4) > 0) 1 else 0);
+        const cols : u16 = @divFloor(config.width,  2) + @as(u16, if (@mod(config.width,  2) > 0) 1 else 0);
+        const rows : u16 = @divFloor(config.height, 4) + @as(u16, if (@mod(config.height, 4) > 0) 1 else 0);
         const output_sizes = calculateOutputSize(cols, rows);
         const output = try RepurposableBuffer.init(output_sizes, config.allocator);
 
@@ -216,7 +216,7 @@ pub const Display = struct {
         // Makes sure the output buffer is configured correctly.
         try self.output.makePurpose(RepurposableBuffer.Purpose.string);
         self.output.clear();
-        var i : u16 = 0;
+        var i : u32 = 0;
         while (i < buffer.buffer.len) : (i += 1) {
             // Print character from lookuptable.
             try self.output.write(UnicodeLookup[buffer.buffer[i]]);
@@ -229,7 +229,7 @@ pub const Display = struct {
     }
 
     /// Prints the entire display represented in unicode braille characters.
-    pub fn print(self : *Display, buffer : *Buffer, row : i8, col : i8, writer : *std.fs.File.Writer) anyerror!void {
+    pub fn print(self : *Display, buffer : *Buffer, row : i32, col : i32, writer : *std.fs.File.Writer) anyerror!void {
         if (Config.compare(self.config, buffer.config) == false)
             return error.ConfigMismatch;
         try self.output.makePurpose(RepurposableBuffer.Purpose.terminal);
@@ -237,7 +237,7 @@ pub const Display = struct {
         // Start off with hiding the cursor and moving to the preferred column and row. as a starting position. (Top left)
         try self.output.writefmt(16, "\x1b[?25l\x1b[{d};{d}H", .{row, col});
         
-        var i : u16 = 0;
+        var i : u32 = 0;
         while (i < buffer.buffer.len) : (i += 1) {
             try self.output.write(UnicodeLookup[buffer.buffer[i]]);
             if (@mod(i + 1, self.config.cols) == 0) {
@@ -258,12 +258,15 @@ pub const Display = struct {
     /// This calculates the requirements with the purpose of displaying to the terminal.
     /// This cost is slightly higher than the cost of generating it as a string.
     /// But it guarantees enough memory is available for any operation.
-    pub fn calculateSize(width : u8, height : u8) usize {
-        const cols : u16 = @divFloor(@as(u16, width),  2) + @as(u16, if (@mod(@as(u16, width),  2) > 0) 1 else 0);
-        const rows : u16 = @divFloor(@as(u16, height), 4) + @as(u16, if (@mod(@as(u16, height), 4) > 0) 1 else 0);
+    pub fn calculateSize(width : u16, height : u16) usize {
+        const cols : u16 = @divFloor(width,  2) + @as(u16, if (@mod(width,  2) > 0) 1 else 0);
+        const rows : u16 = @divFloor(height, 4) + @as(u16, if (@mod(height, 4) > 0) 1 else 0);
         const clen : u16 = switch (cols) {
             0...9 => 1,
             10...99 => 2,
+            100...999 => 3,
+            1000...9999 => 4,
+            10000...99999 => 5,
             else => 3,
         };
         var print_size : u16 = cols * rows * 3 + 16 + (rows - 1) * (7 + clen) + 7;
@@ -271,9 +274,9 @@ pub const Display = struct {
     }
 
     // Calculates the size required for the unicode output string allocation.
-    fn calculateOutputSize(c : u8, r : u8) RepurposableBuffer.Sizes {
-        const cols : u16 = @as(u16, c);
-        const rows : u16 = @as(u16, r);
+    fn calculateOutputSize(c : u16, r : u16) RepurposableBuffer.Sizes {
+        const cols : u16 = c;
+        const rows : u16 = r;
         const buffer_size : u16 = cols * rows;
         const string_size : u16 = buffer_size * 3 + rows;
 
