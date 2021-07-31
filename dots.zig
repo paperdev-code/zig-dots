@@ -106,7 +106,6 @@ pub const Buffer = struct {
             const _y = @intCast(u8, y);
             // Get the index of the correct byte, and a bitmask to extract a single dot.
             const i = self.index(_x, _y);
-            const current = self.buffer[i];
             const m = mask(_x, _y);
             // Depending on the value of the bit, set the byte without the rest of the bytes data.
             var byte : u8 = self.buffer[i];
@@ -137,10 +136,8 @@ pub const Buffer = struct {
             const _x = @intCast(u8, x);
             const _y = @intCast(u8, y);
             const i = self.index(_x, _y);
-            const current = self.buffer[i];
             const m = mask(_x, _y);
-            var new : u8 = 0;
-            return @boolToInt((current & m) > 0);
+            return @boolToInt((self.buffer[i] & m) > 0);
         }
         else return 0;
     }
@@ -152,7 +149,7 @@ pub const Buffer = struct {
     /// Calculate total memory cost for a dots buffer.
     /// This calculates the total size of the buffer, including possible allocated space.
     /// It guarantees enough memory is available for any operation.
-    pub fn calculateSize(width : comptime u8, height : comptime u8) comptime usize {
+    pub fn calculateSize(width : u8, height : u8) usize {
         const cols : u16 = @divFloor(@as(u16, width),  2) + @as(u16, if (@mod(@as(u16, width),  2) > 0) 1 else 0);
         const rows : u16 = @divFloor(@as(u16, height), 4) + @as(u16, if (@mod(@as(u16, height), 4) > 0) 1 else 0);
         return cols * rows + @sizeOf(@TypeOf(Buffer));
@@ -261,7 +258,7 @@ pub const Display = struct {
     /// This calculates the requirements with the purpose of displaying to the terminal.
     /// This cost is slightly higher than the cost of generating it as a string.
     /// But it guarantees enough memory is available for any operation.
-    pub fn calculateSize(width : comptime u8, height : comptime u8) comptime usize {
+    pub fn calculateSize(width : u8, height : u8) usize {
         const cols : u16 = @divFloor(@as(u16, width),  2) + @as(u16, if (@mod(@as(u16, width),  2) > 0) 1 else 0);
         const rows : u16 = @divFloor(@as(u16, height), 4) + @as(u16, if (@mod(@as(u16, height), 4) > 0) 1 else 0);
         const clen : u16 = switch (cols) {
