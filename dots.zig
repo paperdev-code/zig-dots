@@ -266,8 +266,7 @@ pub const Display = struct {
             10...99 => 2,
             100...999 => 3,
             1000...9999 => 4,
-            10000...99999 => 5,
-            else => 3,
+            else => 5,
         };
         var print_size : u16 = cols * rows * 3 + 16 + (rows - 1) * (7 + clen) + 7;
         return @sizeOf(@TypeOf(Display)) + print_size;
@@ -283,7 +282,9 @@ pub const Display = struct {
         const clen : u16 = switch (cols) {
             0...9 => 1,
             10...99 => 2,
-            else => 3,
+            100...999 => 3,
+            1000...9999 => 4,
+            else => 5,
         };
 
         // Calculates the maximum possible size possible with the current configuration.
@@ -377,5 +378,94 @@ const RepurposableBuffer = struct {
     /// Free the buffer.
     fn free(self : *RepurposableBuffer) void {
         self.allocator.free(self.buffer);
+    }
+};
+
+/// An abstraction layer for drawing to the screen.
+/// Features a normalized -1 to 1 coordinate system.
+/// Features line drawing and many shapes.
+/// Simply give a display and buffer.
+pub const Context = struct {
+    /// Buffer associated with this context.
+    buffer : *Buffer,
+    /// width taken from buffer associated config.
+    width : u16,
+    /// height taken form buffer associated config.
+    height : u16,
+
+    /// Initialize a context and point it to a buffer.
+    pub fn init(buffer : *Buffer) !Context {
+        return Context {
+            .buffer = buffer,
+            .width  = buffer.config.width,
+            .height = buffer.config.height, 
+        };
+    }
+
+    /// Point to a different buffer.
+    pub fn swap(self : *Context, buffer : *Buffer, ) !void {
+        self.buffer = buffer;
+        self.width  = buffer.config.width;
+        self.height = buffer.config.height;
+    }
+
+    /// Set based on normalized -1 to 1 coordinate system.
+    pub fn set(self : *Context, x : f32, y : f32, op : Buffer.Operation) void {
+        var xi = @floatToInt(i32, (x0 + 1.0) * @intToFloat(f32, self.width - 1) / 2);
+        var yi = @floatToInt(i32, (y0 + 1.0) * @intToFloat(f32, self.height - 1) / 2);
+        self.buffer.set(xi, yi, op);
+    }
+
+    /// Draw a line from point (x0, y0) to (x1, y1)
+    /// An essential for all other drawing methods.
+    pub fn line(self : *Context, x0 : f32, y0 : f32, x1 : f32, y1 : f32, op : Buffer.Operation) void {
+        var x0f = (x0 + 1.0) * @intToFloat(f32, self.width - 1) / 2;
+        var y0f = (y0 + 1.0) * @intToFloat(f32, self.height - 1) / 2;
+        var x1f = (x1 + 1.0) * @intToFloat(f32, self.width - 1) / 2;
+        var y1f = (y1 + 1.0) * @intToFloat(f32, self.height - 1) / 2;
+        var dx = x1f - x0f;
+        var dy = y1f - y0f;
+        var absdx = std.math.fabs(dx);
+        var absdy = std.math.fabs(dy);
+        var steps = if (absdx > absdy) absdx else absdy;
+        var xincr = dx / steps;
+        var yincr = dy / steps;
+        var i : i32 = 0;
+        self.buffer.set(@floatToInt(i32, x0f), @floatToInt(i32, y0f), op);
+        while (i < @floatToInt(i32, steps)) {
+            self.buffer.set(@floatToInt(i32, x0f), @floatToInt(i32, y0f), op);
+            x0f += xincr;
+            y0f += yincr;
+            i += 1;
+        }
+    }
+
+    /// Draw a rectangle
+    pub fn rect(self : *Context, x0 : f32, y0 : f32, x1 : f32, y1 : f32, op : Buffer.Operation) void {
+        self.line(x0, y0, x1, y0, op);
+        self.line(x1, y0, x1, y1, op);
+        self.line(x1, y1, x0, y1, op);
+        self.line(x0, y1, x0, y0, op);
+    }
+
+    pub fn circ(self : *Context, x : f32, y : f32, begin : f32, end : f32, radius : f32, segments : i32, op : Buffer.Operation) void {
+
+        var _begin = if (end > begin) end else begin;
+        var _end   = if (end > begin) begin else end;
+
+        var incr = (_end - _begin) / @intToFloat(f32, segments);
+        var i : i32 = 0;
+        while (i < segments) {
+            var this_x : f32 = std.math.sin(@intToFloat(f32, i) * incr + _begin) * radius + x;
+            var this_y : f32 = std.math.cos(@intToFloat(f32, i) * incr + _begin) * radius + y;
+            var next_x : f32 = std.math.sin((@intToFloat(f32, i) + 1) * incr + _begin) * radius + x;
+            var next_y : f32 = std.math.cos((@intToFloat(f32, i) + 1) * incr + _begin) * radius + y;
+            self.line(this_x, this_y, next_x, next_y, op);
+            i += 1;
+        }
+    }
+
+    pub fn clear(self : *Context) void {
+        self.buffer.clear();
     }
 };
