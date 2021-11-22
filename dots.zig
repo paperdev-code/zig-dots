@@ -411,8 +411,8 @@ pub const Context = struct {
 
     /// Set based on normalized -1 to 1 coordinate system.
     pub fn set(self : *Context, x : f32, y : f32, op : Buffer.Operation) void {
-        var xi = @floatToInt(i32, (x0 + 1.0) * @intToFloat(f32, self.width - 1) / 2);
-        var yi = @floatToInt(i32, (y0 + 1.0) * @intToFloat(f32, self.height - 1) / 2);
+        var xi = @floatToInt(i32, (x + 1.0) * @intToFloat(f32, self.width - 1) / 2);
+        var yi = @floatToInt(i32, (y + 1.0) * @intToFloat(f32, self.height - 1) / 2);
         self.buffer.set(xi, yi, op);
     }
 
