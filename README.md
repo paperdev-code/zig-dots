@@ -1,5 +1,12 @@
-<center><img src='dots.gif'></img></center>
-<br><br>
+<!--lint disable no-literal-urls-->
+
+<p align="center">
+<img
+  alt="[Dots]"
+  src="dots.gif"
+/>
+</p>
+<br>
 
 # A semigraphical drawing library made in Zig.
 I created this library as a way to learn my way around the Zig programming language. It is a type of virtual dot matrix that can be either printed to the terminal, or returned as a string that consists of **Unicode** Braille characters.
