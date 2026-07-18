@@ -1,0 +1,12 @@
+.{
+    .name = .dots,
+    .version = "0.0.0-infdev",
+    .paths = .{
+        "src",
+        "build.zig",
+        "build.zig.zon",
+    },
+    .dependencies = .{},
+    .minimum_zig_version = "0.15.0-dev.375+8f8f37fb0",
+    .fingerprint = 0x54d4af219782d0e2,
+}
