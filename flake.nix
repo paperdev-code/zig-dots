@@ -2,8 +2,6 @@
   description = "A semigraphical graphics library in Zig";
 
   inputs = {
-    flake-parts.url = "github:hercules-ci/flake-parts";
-    flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
     nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
     systems.url = "github:nix-systems/default";
     zig.url = "github:silversquirl/zig-flake";
@@ -11,12 +9,14 @@
   };
 
   outputs =
-    inputs@{ flake-parts, ... }:
-    flake-parts.lib.mkFlake { inherit inputs; } {
+    inputs:
+    let
+      inherit (inputs.nixpkgs) lib;
       systems = import inputs.systems;
-
-      perSystem = { system, ... }: {
-        devShells.default = inputs.zig.devShells.${system}.default;
-      };
+    in
+    {
+      devShells = lib.genAttrs systems (system: {
+        default = inputs.zig.devShells.${system}.default;
+      });
     };
 }
