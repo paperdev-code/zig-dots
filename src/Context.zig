@@ -149,42 +149,6 @@ pub fn arc(context: *const Context, x: f32, y: f32, angle_begin: f32, angle_end:
     }
 }
 
-const PointIteratorOptions = struct {
-    values_per_point: usize,
-    points_per_chunk: usize,
-    window_step_size: usize,
-};
-
-fn PointIterator(opts: PointIteratorOptions) type {
-    return struct {
-        const values_per_point = opts.values_per_point;
-        const points_per_chunk = opts.points_per_chunk;
-        const buffer_step_size = opts.window_step_size * values_per_point;
-
-        pub const Point = @Tuple(&@as([opts.values_per_point]type, @splat(f32)));
-        pub const Chunk = [points_per_chunk]Point;
-
-        buffer: []const f32,
-        buffer_index: usize,
-
-        pub fn init(buffer: []const f32) Self {
-            return .{ .buffer = buffer, .buffer_index = 0 };
-        }
-
-        pub fn next(pit: *Self) ?*const Chunk {
-            const window_idx_start = pit.buffer_index;
-            const window_idx_end = window_idx_start + points_per_chunk * values_per_point;
-            if (window_idx_end > pit.buffer.len) {
-                return null;
-            }
-            pit.buffer_index += buffer_step_size;
-            return @ptrCast(&pit.buffer[window_idx_start]);
-        }
-
-        pub const Self = @This();
-    };
-}
-
 pub fn points(context: *const Context, data: []const f32, op: Operation, v: u1) void {
     var pit: PointIterator(.{
         .values_per_point = 2,
@@ -414,6 +378,7 @@ test Allocated {
 }
 
 const Context = @This();
+const PointIterator = dots.point_iterator.PointIterator;
 const dots = @import("dots");
 const Allocator = std.mem.Allocator;
 const std = @import("std");
