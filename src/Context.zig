@@ -117,10 +117,6 @@ pub fn get(context: *const Context, x: f32, y: f32) u1 {
 }
 
 pub fn line(context: *const Context, x1: f32, y1: f32, x2: f32, y2: f32, op: Operation, v: u1) void {
-    // if (outOfBounds(x1 * context.aspect, y1, x2 * context.aspect, y2)) {
-    //    @branchHint(.unlikely);
-    //    return;
-    // }
     const width, const height = context.dimensions();
     const ax = screenspaceTransform(x1 * context.aspect, width);
     const ay = screenspaceTransform(y1, height);
@@ -402,21 +398,80 @@ fn screenspaceTransform(v: f32, max: u16) i17 {
     return @as(i17, @intFromFloat(norm * scale));
 }
 
-fn outOfBounds(x1: f32, y1: f32, x2: f32, y2: f32) bool {
-    // simple check whether two points would be entirely outside the bounds
-    // [explainer](https://en.wikipedia.org/wiki/Cohen-Sutherland_algorithm)
-    // zig fmt: off
-    return @max(x1, x2) < -1.0
-        or @min(x1, x2) >  1.0
-        or @max(y1, y2) < -1.0
-        or @min(y1, y2) >  1.0;
-    // zig fmt: on
-}
-
-fn calculateLineClip(ax: i17, ay: i17, bx: i17, by: i17, _: u16, _: u16) ?@Tuple(&@as([4]type, @splat(i17))) {
+fn calculateLineClip(ax: i17, ay: i17, bx: i17, by: i17, width: u16, height: u16) ?@Tuple(&@as([4]type, @splat(i17))) {
     // calculate the line clip, i.e the points which intersect the viewport
     // [explainer](https://en.wikipedia.org/wiki/Cohen-Sutherland_algorithm)
-    return .{ ax, ay, bx, by };
+    const OutCode = packed struct(u4) {
+        above: u1,
+        below: u1,
+        left: u1,
+        right: u1,
+
+        pub fn inside(oc: @This()) bool {
+            return @backingInt(oc) == 0;
+        }
+
+        pub fn sharedZone(oc: @This(), other: @This()) bool {
+            return @backingInt(oc) & @backingInt(other) != 0;
+        }
+
+        pub fn get(x: i17, y: i17, x_max: u16, y_max: u16) @This() {
+            var code: @This() = @fromBackingInt(0);
+            if (x < 0)
+                code.left = 1
+            else
+                code.right = @intFromBool(x > x_max);
+            if (y < 0)
+                code.below = 1
+            else
+                code.above = @intFromBool(y > y_max);
+            return code;
+        }
+    };
+
+    // zig fmt: off
+    var ax_tmp,
+    var ay_tmp,
+    var bx_tmp,
+    var by_tmp = .{ ax, ay, bx, by };
+    // zig fmt: on
+
+    var a_oc = OutCode.get(ax, ay, width, height);
+    var b_oc = OutCode.get(bx, by, width, height);
+
+    for (0..4) |_| {
+        if (a_oc.inside() and b_oc.inside()) return .{ ax, ay, bx, by };
+        if (a_oc.sharedZone(b_oc)) return null;
+
+        const outside = if (!a_oc.inside()) a_oc else b_oc;
+        var x: i17, var y: i17 = .{ undefined, undefined };
+
+        if (outside.above != 0) {
+            x = ax_tmp + (bx_tmp - ax_tmp) * @divFloor(height - ay_tmp, by_tmp - ay_tmp);
+            y = height;
+        } else if (outside.below != 0) {
+            x = ax_tmp + (bx_tmp - ax_tmp) * @divFloor(-ay_tmp, by_tmp - ay_tmp);
+            y = 0;
+        } else if (outside.right != 0) {
+            x = width;
+            y = ay_tmp + (by_tmp - ay_tmp) * @divFloor(width - ax_tmp, bx_tmp - ax_tmp);
+        } else if (outside.left != 0) {
+            x = 0;
+            y = ay_tmp + (by_tmp - ay_tmp) * @divFloor(-ay_tmp, bx_tmp - ax_tmp);
+        }
+
+        if (a_oc == outside) {
+            ax_tmp = x;
+            ay_tmp = y;
+            a_oc = OutCode.get(ax_tmp, ay_tmp, width, height);
+        } else {
+            bx_tmp = x;
+            by_tmp = y;
+            b_oc = OutCode.get(bx_tmp, by_tmp, width, height);
+        }
+    }
+
+    unreachable;
 }
 
 fn distanceApprox(x1: f32, y1: f32, x2: f32, y2: f32) f32 {
