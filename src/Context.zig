@@ -310,9 +310,9 @@ pub const Allocated = struct {
         const back_buffer = &allocated.context.buffer;
         const front_buffer = back_buffer.*;
         if (back_buffer.ptr == allocated.buffer.ptr) {
-            back_buffer.ptr = @constCast(allocated.buffer.ptr) + back_buffer.len;
+            back_buffer.ptr = allocated.buffer.ptr + back_buffer.len;
         } else {
-            back_buffer.ptr = @constCast(allocated.buffer.ptr);
+            back_buffer.ptr = allocated.buffer.ptr;
         }
         return front_buffer;
     }
