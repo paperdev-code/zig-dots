@@ -50,10 +50,11 @@ pub fn dimensions(context: *const Context) struct { u16, u16 } {
 }
 
 pub fn bitset(context: *const Context, x: i17, y: i17, op: Operation, v: u1) void {
-    if (x < context.x_min or x >= context.x_max or
-        y < context.y_min or y >= context.y_max) return;
-    const index = dots.mem.positionToBufferIndex(@intCast(x), @intCast(y), context.columns);
-    const mask = dots.glyph.positionToBitmask(@intCast(x), @intCast(y));
+    const x_abs, const y_abs = .{ x + context.x_min, y + context.y_min };
+    if (x_abs < context.x_min or x_abs >= context.x_max or
+        y_abs < context.y_min or y_abs >= context.y_max) return;
+    const index = dots.mem.positionToBufferIndex(@intCast(x_abs), @intCast(y_abs), context.columns);
+    const mask = dots.glyph.positionToBitmask(@intCast(x_abs), @intCast(y_abs));
     const bits = mask & 0 -% @as(u8, v);
     const byte = context.buffer[index];
     context.buffer[index] = switch (op) {
@@ -65,15 +66,17 @@ pub fn bitset(context: *const Context, x: i17, y: i17, op: Operation, v: u1) voi
 }
 
 pub fn bitget(context: *const Context, x: i17, y: i17) u1 {
-    if (x < context.x_min or x >= context.x_max or
-        y < context.y_min or y >= context.y_max) return 0;
-    const index = dots.mem.positionToBufferIndex(@intCast(x), @intCast(y), context.columns);
-    const mask = dots.glyph.positionToBitmask(@intCast(x), @intCast(y));
+    const x_abs, const y_abs = .{ x + context.x_min, y + context.y_min };
+    if (x_abs < context.x_min or x_abs >= context.x_max or
+        y_abs < context.y_min or y_abs >= context.y_max) return 0;
+    const index = dots.mem.positionToBufferIndex(@intCast(x_abs), @intCast(y_abs), context.columns);
+    const mask = dots.glyph.positionToBitmask(@intCast(x_abs), @intCast(y_abs));
     return @intFromBool(context.buffer[index] & mask > 0);
 }
 
 pub fn clear(context: *const Context) void {
-    for (context.y_min..context.y_max) |y| for (context.x_min..context.x_max) |x| {
+    const width, const height = context.dimensions();
+    for (0..height) |y| for (0..width) |x| {
         context.bitset(@intCast(x), @intCast(y), .dot_set, 0);
     };
 }
@@ -81,14 +84,14 @@ pub fn clear(context: *const Context) void {
 pub fn blit(target: *const Context, x: i17, y: i17, op: Operation, source: *const Context) Context {
     const width, const height = source.dimensions();
     var target_region = target.region(x, y, width, height);
-    for (0..width) |y_| for (0..height) |x_| {
+    for (0..height) |region_y| for (0..width) |region_x| {
         target_region.bitset(
-            target.x_min + x + @as(i17, @intCast(x_)),
-            target.y_min + y + @as(i17, @intCast(y_)),
+            @as(i17, @intCast(region_x)),
+            @as(i17, @intCast(region_y)),
             op,
             source.bitget(
-                source.x_min + @as(i17, @intCast(x_)),
-                source.y_min + @as(i17, @intCast(y_)),
+                @as(i17, @intCast(region_x)),
+                @as(i17, @intCast(region_y)),
             ),
         );
     };
@@ -96,32 +99,41 @@ pub fn blit(target: *const Context, x: i17, y: i17, op: Operation, source: *cons
 }
 
 pub fn set(context: *const Context, x: f32, y: f32, op: Operation, v: u1) void {
+    const width, const height = context.dimensions();
     context.bitset(
-        screenspaceTransform(x * context.aspect, context.x_min, context.x_max),
-        screenspaceTransform(y, context.y_min, context.y_max),
+        screenspaceTransform(x * context.aspect, width),
+        screenspaceTransform(y, height),
         op,
         v,
     );
 }
 
 pub fn get(context: *const Context, x: f32, y: f32) u1 {
+    const width, const height = context.dimensions();
     return context.bitget(
-        screenspaceTransform(x * context.aspect, context.x_min, context.x_max),
-        screenspaceTransform(y, context.y_min, context.y_max),
+        screenspaceTransform(x * context.aspect, width),
+        screenspaceTransform(y, height),
     );
 }
 
 pub fn line(context: *const Context, x1: f32, y1: f32, x2: f32, y2: f32, op: Operation, v: u1) void {
-    if (outOfBounds(x1 * context.aspect, y1, x2 * context.aspect, y2)) {
-        @branchHint(.unlikely);
-        return;
-    }
-    const ax = screenspaceTransform(x1 * context.aspect, context.x_min, context.x_max);
-    const ay = screenspaceTransform(y1, context.y_min, context.y_max);
-    const bx = screenspaceTransform(x2 * context.aspect, context.x_min, context.x_max);
-    const by = screenspaceTransform(y2, context.y_min, context.y_max);
-    const dx = bx - ax;
-    const dy = by - ay;
+    // if (outOfBounds(x1 * context.aspect, y1, x2 * context.aspect, y2)) {
+    //    @branchHint(.unlikely);
+    //    return;
+    // }
+    const width, const height = context.dimensions();
+    const ax = screenspaceTransform(x1 * context.aspect, width);
+    const ay = screenspaceTransform(y1, height);
+    const bx = screenspaceTransform(x2 * context.aspect, width);
+    const by = screenspaceTransform(y2, height);
+    // zig fmt: off
+    const ax_clip,
+    const ay_clip,
+    const bx_clip,
+    const by_clip = calculateLineClip(ax, ay, bx, by, width, height) orelse return;
+    // zig fmt: on
+    const dx = bx_clip - ax_clip;
+    const dy = by_clip - ay_clip;
     const steps: u32 = @max(@abs(dx), @abs(dy));
     const x_increment = @as(f32, @floatFromInt(dx)) / @as(f32, @floatFromInt(steps));
     const y_increment = @as(f32, @floatFromInt(dy)) / @as(f32, @floatFromInt(steps));
@@ -383,11 +395,11 @@ const dots = @import("dots");
 const Allocator = std.mem.Allocator;
 const std = @import("std");
 
-fn screenspaceTransform(v: f32, min: u16, max: u16) i17 {
+fn screenspaceTransform(v: f32, max: u16) i17 {
     // subtracts 1 from `max` to ensure 1.0 is within bounds rather than just outside of it
     const norm = (v + 1.0) / 2.0;
-    const scale = @as(f32, @floatFromInt(max - min - 1));
-    return @as(i17, @intFromFloat(norm * scale)) + min;
+    const scale = @as(f32, @floatFromInt(max - 1));
+    return @as(i17, @intFromFloat(norm * scale));
 }
 
 fn outOfBounds(x1: f32, y1: f32, x2: f32, y2: f32) bool {
@@ -399,6 +411,12 @@ fn outOfBounds(x1: f32, y1: f32, x2: f32, y2: f32) bool {
         or @max(y1, y2) < -1.0
         or @min(y1, y2) >  1.0;
     // zig fmt: on
+}
+
+fn calculateLineClip(ax: i17, ay: i17, bx: i17, by: i17, _: u16, _: u16) ?@Tuple(&@as([4]type, @splat(i17))) {
+    // calculate the line clip, i.e the points which intersect the viewport
+    // [explainer](https://en.wikipedia.org/wiki/Cohen-Sutherland_algorithm)
+    return .{ ax, ay, bx, by };
 }
 
 fn distanceApprox(x1: f32, y1: f32, x2: f32, y2: f32) f32 {
