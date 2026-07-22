@@ -126,7 +126,7 @@ pub fn line(context: *const Context, x1: f32, y1: f32, x2: f32, y2: f32, op: Ope
     const ax_clip,
     const ay_clip,
     const bx_clip,
-    const by_clip = calculateLineClip(ax, ay, bx, by, width, height) orelse return;
+    const by_clip = clipLineToViewport(ax, ay, bx, by, width, height) orelse return;
     // zig fmt: on
     const dx = bx_clip - ax_clip;
     const dy = by_clip - ay_clip;
@@ -389,7 +389,6 @@ const Context = @This();
 const PointIterator = dots.point_iterator.PointIterator;
 const dots = @import("dots");
 const Allocator = std.mem.Allocator;
-const std = @import("std");
 
 fn screenspaceTransform(v: f32, max: u16) i17 {
     // subtracts 1 from `max` to ensure 1.0 is within bounds rather than just outside of it
@@ -398,14 +397,14 @@ fn screenspaceTransform(v: f32, max: u16) i17 {
     return @as(i17, @intFromFloat(norm * scale));
 }
 
-fn calculateLineClip(ax: i17, ay: i17, bx: i17, by: i17, width: u16, height: u16) ?@Tuple(&@as([4]type, @splat(i17))) {
+fn clipLineToViewport(ax: i17, ay: i17, bx: i17, by: i17, width: u16, height: u16) ?@Tuple(&@as([4]type, @splat(i17))) {
     // calculate the line clip, i.e the points which intersect the viewport
     // [explainer](https://en.wikipedia.org/wiki/Cohen-Sutherland_algorithm)
     const OutCode = packed struct(u4) {
-        above: u1,
-        below: u1,
-        left: u1,
-        right: u1,
+        above: bool,
+        below: bool,
+        left: bool,
+        right: bool,
 
         pub fn inside(oc: @This()) bool {
             return builtins.backingInt(oc) == 0;
@@ -418,13 +417,13 @@ fn calculateLineClip(ax: i17, ay: i17, bx: i17, by: i17, width: u16, height: u16
         pub fn get(x: i17, y: i17, x_max: u16, y_max: u16) @This() {
             var code = builtins.fromBackingInt(@This(), 0);
             if (x < 0)
-                code.left = 1
+                code.left = true
             else
-                code.right = @intFromBool(x > x_max);
+                code.right = x > x_max;
             if (y < 0)
-                code.below = 1
+                code.below = true
             else
-                code.above = @intFromBool(y > y_max);
+                code.above = y > y_max;
             return code;
         }
     };
@@ -446,16 +445,16 @@ fn calculateLineClip(ax: i17, ay: i17, bx: i17, by: i17, width: u16, height: u16
         const outside = if (!a_oc.inside()) a_oc else b_oc;
         var x: i17, var y: i17 = .{ undefined, undefined };
 
-        if (outside.above != 0) {
+        if (outside.above) {
             x = ax_tmp + (bx_tmp - ax_tmp) * @divFloor(height - ay_tmp, by_tmp - ay_tmp);
             y = height;
-        } else if (outside.below != 0) {
+        } else if (outside.below) {
             x = ax_tmp + (bx_tmp - ax_tmp) * @divFloor(-ay_tmp, by_tmp - ay_tmp);
             y = 0;
-        } else if (outside.right != 0) {
+        } else if (outside.right) {
             x = width;
             y = ay_tmp + (by_tmp - ay_tmp) * @divFloor(width - ax_tmp, bx_tmp - ax_tmp);
-        } else if (outside.left != 0) {
+        } else if (outside.left) {
             x = 0;
             y = ay_tmp + (by_tmp - ay_tmp) * @divFloor(-ay_tmp, bx_tmp - ax_tmp);
         }
@@ -475,11 +474,18 @@ fn calculateLineClip(ax: i17, ay: i17, bx: i17, by: i17, width: u16, height: u16
 }
 
 fn distanceApprox(x1: f32, y1: f32, x2: f32, y2: f32) f32 {
+    // zig fmt: off
+    const pi,
+    const cos,
+    const sin = .{ std.math.pi, std.math.cos, std.math.sin };
+    // zig fmt: on
     // approximate distance calculation using 'alpha max plus beta min'
     // [explainer](https://en.wikipedia.org/wiki/Alpha_max_plus_beta_min_algorithm)
-    const dx = @abs(x2 - x1);
-    const dy = @abs(y2 - y1);
-    return (0.941246 * @max(dx, dy) + 0.415692 * @min(dx, dy));
+    const alpha: f32 = comptime (2.0 * cos(pi / 8.0)) / (1 + cos(pi / 8.0));
+    const beta: f32 = comptime (2.0 * sin(pi / 8.0)) / (1 + cos(pi / 8.0));
+    const dx, const dy = .{ @abs(x2 - x1), @abs(y2 - y1) };
+    return (alpha * @max(dx, dy) + beta * @min(dx, dy));
 }
 
 const builtins = @import("future_builtins.zig");
+const std = @import("std");
