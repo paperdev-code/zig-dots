@@ -408,15 +408,15 @@ fn calculateLineClip(ax: i17, ay: i17, bx: i17, by: i17, width: u16, height: u16
         right: u1,
 
         pub fn inside(oc: @This()) bool {
-            return @backingInt(oc) == 0;
+            return builtins.backingInt(oc) == 0;
         }
 
         pub fn sharedZone(oc: @This(), other: @This()) bool {
-            return @backingInt(oc) & @backingInt(other) != 0;
+            return builtins.backingInt(oc) & builtins.backingInt(other) != 0;
         }
 
         pub fn get(x: i17, y: i17, x_max: u16, y_max: u16) @This() {
-            var code: @This() = @fromBackingInt(0);
+            var code = builtins.fromBackingInt(@This(), 0);
             if (x < 0)
                 code.left = 1
             else
@@ -481,3 +481,5 @@ fn distanceApprox(x1: f32, y1: f32, x2: f32, y2: f32) f32 {
     const dy = @abs(y2 - y1);
     return (0.941246 * @max(dx, dy) + 0.415692 * @min(dx, dy));
 }
+
+const builtins = @import("future_builtins.zig");

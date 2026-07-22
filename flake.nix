@@ -12,7 +12,7 @@
     let
       inherit (inputs.nixpkgs) lib legacyPackages;
       eachSystem =
-        f: lib.mapAttrs (system: pkgs: f pkgs inputs.zig.packages.${system}.nightly) legacyPackages;
+        f: lib.mapAttrs (system: pkgs: f pkgs inputs.zig.packages.${system}.default) legacyPackages;
     in
     {
       devShells = eachSystem (
