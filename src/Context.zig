@@ -204,11 +204,12 @@ pub fn quadratic(context: *const Context, data: []const f32, op: Operation, v: u
         .points_per_chunk = 3,
         .window_step_size = 2,
     }) = .init(data);
-    const Point = @TypeOf(pit).Point;
+    const width, const height = context.dimensions();
     while (pit.next()) |curve| {
+        const Point = @TypeOf(pit).Point;
         var prev_point: Point = curve[0];
         var curr_point: Point = undefined;
-        const segments: usize = @intFromFloat(16 *
+        const segments: usize = @intFromFloat((@max(width, height) / 8) *
             distanceApprox(curve[0].@"0", curve[0].@"1", curve[1].@"0", curve[1].@"1") +
             distanceApprox(curve[1].@"0", curve[1].@"1", curve[2].@"0", curve[2].@"1"));
         for (1..segments + 1) |step| {
@@ -234,11 +235,12 @@ pub fn cubic(context: *const Context, data: []const f32, op: Operation, v: u1) v
         .points_per_chunk = 4,
         .window_step_size = 3,
     }) = .init(data);
-    const Point = @TypeOf(pit).Point;
+    const width, const height = context.dimensions();
     while (pit.next()) |curve| {
+        const Point = @TypeOf(pit).Point;
         var prev_point: Point = curve[0];
         var curr_point: Point = undefined;
-        const segments: usize = @intFromFloat(24 *
+        const segments: usize = @intFromFloat((@max(width, height) / 8) *
             distanceApprox(curve[0].@"0", curve[0].@"1", curve[1].@"0", curve[1].@"1") +
             distanceApprox(curve[1].@"0", curve[1].@"1", curve[2].@"0", curve[2].@"1") +
             distanceApprox(curve[2].@"0", curve[2].@"1", curve[3].@"0", curve[3].@"1"));
