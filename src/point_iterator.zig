@@ -33,3 +33,23 @@ pub fn PointIterator(opts: PointIteratorOptions) type {
         pub const Self = @This();
     };
 }
+
+test PointIterator {
+    const buffer = [_]f32{
+        0.0,
+        0.5,
+        1.0,
+    };
+
+    var pit: PointIterator(.{
+        .values_per_point = 1,
+        .points_per_chunk = 1,
+        .window_step_size = 1,
+    }) = .init(&buffer);
+
+    try std.testing.expectEqual(@as(*const f32, @ptrCast(pit.next().?)), &buffer[0]);
+    try std.testing.expectEqual(@as(*const f32, @ptrCast(pit.next().?)), &buffer[1]);
+    try std.testing.expectEqual(@as(*const f32, @ptrCast(pit.next().?)), &buffer[2]);
+}
+
+const std = @import("std");

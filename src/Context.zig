@@ -302,24 +302,6 @@ pub const Allocated = struct {
     }
 };
 
-test PointIterator {
-    const buffer = [_]f32{
-        0.0,
-        0.5,
-        1.0,
-    };
-
-    var pit: PointIterator(.{
-        .values_per_point = 1,
-        .points_per_chunk = 1,
-        .window_step_size = 1,
-    }) = .init(&buffer);
-
-    try std.testing.expectEqual(@as(*const f32, @ptrCast(pit.next().?)), &buffer[0]);
-    try std.testing.expectEqual(@as(*const f32, @ptrCast(pit.next().?)), &buffer[1]);
-    try std.testing.expectEqual(@as(*const f32, @ptrCast(pit.next().?)), &buffer[2]);
-}
-
 fn expectNumberOfDots(target: usize, context: *const Context) !void {
     var counted: usize = 0;
     for (context.y_min..context.y_max) |y| for (context.x_min..context.x_max) |x| {
